@@ -1,0 +1,75 @@
+version: "3"
+
+services:
+  nginx-proxy:
+    image: jwilder/nginx-proxy:latest
+    container_name: nginx-proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/folders/certs:/etc/nginx/certs:ro
+      - /etc/nginx/vhost.d
+      - /usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - mauticnet
+    labels:
+      - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
+
+  letsencrypt-companion:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: letsencrypt-companion
+    restart: always
+    volumes:
+      - /var/folders/certs:/etc/nginx/certs:rw
+      - /etc/nginx/vhost.d
+      - /usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - nginx-proxy
+    networks:
+      - mauticnet
+
+  mysql:
+    image: percona/percona-server:5.7
+    platform: linux/amd64
+    container_name: mysql
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "root"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - mauticnet
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+
+  mautic:
+    image: mautic/mautic:latest
+    container_name: mautic
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      MAUTIC_DB_HOST: mysql
+      MAUTIC_DB_USER: root
+      MAUTIC_DB_PASSWORD: "root"
+      MAUTIC_DB_NAME: mautic
+      # VIRTUAL_HOST: mautic.yourdomain.com
+      # LETSENCRYPT_HOST: mautic.yourdomain.com
+      # LETSENCRYPT_EMAIL: help@yourdomain.com
+    volumes:
+      - mautic_data:/var/www/html
+    networks:
+      - mauticnet
+    privileged: true
+
+networks:
+  mauticnet:
+
+volumes:
+  mysql_data:
+  mautic_data:
